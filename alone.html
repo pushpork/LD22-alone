@@ -1,0 +1,533 @@
+<html>
+  <head>
+    <script id="vs-tile" type="x-shader/x-vertex">
+precision highp float;
+
+attribute vec3 vPos;
+
+uniform mat4 modelview;
+uniform mat4 project;
+
+uniform vec3 offset;
+uniform float flip;
+
+varying vec2 texCoord;
+
+void main(void) {
+	texCoord = vPos.xy;
+	if (flip == 1.0)
+		texCoord.x = -texCoord.x + 1.0;
+	vec2 coord = vPos.xy + offset.xy;
+	vec4 pos = modelview * vec4(coord, offset.z, 1.0);
+	pos.xy *= 64.0;
+	gl_Position = project * pos;
+}
+    </script>
+    <script id="fs-tile" type="x-shader/x-fragment">
+precision highp float;
+
+uniform sampler2D tile;
+
+varying vec2 texCoord;
+
+void main(void) {
+	vec4 result = texture2D(tile, texCoord);
+	gl_FragColor = result;
+}
+    </script>
+    
+    <link rel="stylesheet" type="text/css" href="lib/alone.css"/>
+    
+    <script type="text/javascript" src="lib/jquery.js"></script>
+    <script type="text/javascript" src="lib/glMatrix.js"></script>
+
+    <script type="text/javascript">
+    	var config = {
+    		width: 648,
+    		height: 480
+    	};
+    	var programs = {
+    		tile: 0
+    	};
+    	var textures = new Array();
+    	var sprites = {
+    		character: {
+    			idle: 0
+    		}
+    	};
+    	var tiles = new Array();
+    	var level_data;
+    	var loaded = false;
+    	var posX = 0.0;
+    	var posY = 0.0;
+    	var jumping = false;
+    	var jumpCell = 0;
+    	var flip = 0;
+    	
+    	var keymap = {
+    		left: 0,
+    		right: 0,
+    		jump: 0
+    	};
+    	
+    	
+    	var gl;
+    	
+    	var identity;
+    	var modelview;
+    	var projection;
+    	
+    	var quad = [	1.0, 1.0, 0.0,
+    			0.0, 1.0, 0.0,
+    			0.0, 0.0, 0.0,
+    			
+    		 	1.0, 1.0, 0.0,
+    		 	1.0, 0.0, 0.0,
+    		 	0.0, 0.0, 0.0 ];
+    	var quadVBO;
+    	
+    	window.requestAnimFrame = (function() {
+		return  window.requestAnimationFrame	||
+		window.webkitRequestAnimationFrame	||
+		window.mozRequestAnimationFrame		||
+		window.oRequestAnimationFrame		||
+		window.msRequestAnimationFrame		||
+		function(/* function */ callback, /* DOMElement */ element){
+			window.setTimeout(callback, 1000 / 60);
+		};
+	})();
+	
+	function loadJSON(file) {
+		var result;
+		var http = new XMLHttpRequest();
+		
+		http.overrideMimeType("application/json");
+		http.open('GET', file, false);
+		http.onReadyStateChange = function () {
+			if (http.readyState == 4) {
+				var json = http.responseText;
+				result = eval(json);
+			}
+		}
+		http.send(null);
+		
+		return result;
+	}
+	
+	function load_level(file) {
+		loaded = false;
+		$('#level-script').attr('src', 'levels/'+file);
+	}
+	
+	function getShader(id) {
+		var shader;
+		var el = $('#'+id);
+		var src = el.text();
+		var type = el.attr('type');
+		
+		if (type == "x-shader/x-vertex")
+			shader = gl.createShader(gl.VERTEX_SHADER);
+		else if (type == "x-shader/x-fragment")
+			shader = gl.createShader(gl.FRAGMENT_SHADER);
+		else
+			return null;
+			
+		gl.shaderSource(shader, src);
+		gl.compileShader(shader);
+		
+		if (gl.getShaderParameter(shader, gl.COMPILE_STATUS) == 0)
+			alert(gl.getShaderInfoLog(shader));
+
+		return shader;
+	}
+	
+	function fetch_textures() {
+		var done = true;
+		var t = 0;
+		
+		for (t = 0; t < textures.length; t++) {
+			if (!textures[t].loaded) {
+				if (textures[t].img[0].complete) {
+					handle_loaded_texture(textures[t]);
+					textures[t].loaded = true;
+				} else {
+					done = false;
+				}
+			}
+		}
+		
+		if (!done) {
+			setTimeout('fetch_textures()', 100);
+		}
+	};
+	
+	function handle_loaded_texture(texture) {
+		gl.bindTexture(gl.TEXTURE_2D, texture);
+		gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.img[0]);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.bindTexture(gl.TEXTURE_2D, null);
+	}
+
+    	
+    	function load_programs() {
+    		var tileVS, tileFS;
+    		
+		tileVS = getShader("vs-tile");
+		tileFS = getShader("fs-tile");
+	
+		programs.tile = gl.createProgram();
+		gl.attachShader(programs.tile, tileVS);
+		gl.attachShader(programs.tile, tileFS);
+		gl.linkProgram(programs.tile);
+	
+		gl.useProgram(programs.tile);
+	
+		programs.tile.vposAttr = gl.getAttribLocation(programs.tile, "vPos");
+		gl.enableVertexAttribArray(programs.tile.vposAttr);
+		programs.tile.flipUniform = gl.getUniformLocation(programs.tile, "flip");
+		programs.tile.samplerUniform = gl.getUniformLocation(programs.tile, "tile");
+		programs.tile.offsetUniform = gl.getUniformLocation(programs.tile, "offset");
+		programs.tile.projectUniform = gl.getUniformLocation(programs.tile, "project");
+		programs.tile.modelviewUniform = gl.getUniformLocation(programs.tile, "modelview");
+    	}
+    	
+    	function insert_texture(elem) {
+    		var idx = textures.length;
+    		textures[idx] = gl.createTexture();
+    		textures[idx].img = $('#'+elem);
+    		textures[idx].loaded = false;
+    		
+    		return idx;
+    	}
+    	
+    	function load_textures() {
+    		sprites.character.idle = insert_texture('sprite-character-idle');
+		
+		tiles[0] = insert_texture('tile-grass');
+		tiles[1] = insert_texture('tile-dirt');
+		
+		// school tiles
+		tiles[10] = insert_texture('tile-concrete');
+		tiles[11] = insert_texture('tile-hard-floor');
+		tiles[12] = insert_texture('tile-door-bottom');
+		tiles[13] = insert_texture('tile-door-top');
+		tiles[14] = insert_texture('tile-locker');
+		tiles[15] = insert_texture('tile-steps');
+		tiles[16] = insert_texture('tile-ceiling');
+		
+		fetch_textures();
+    	}
+    	
+    	function init_buffers() {
+    		quadVBO = gl.createBuffer();
+    		gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+    		gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(quad), gl.STATIC_DRAW);
+    		
+    		quadVBO.size = 3;
+    		quadVBO.count = 6;
+    	}
+    	
+    	function event_key_down(e) {
+    		switch(e.keyCode) {
+    		case 32:
+    			keymap.jump = 1;
+    			break;
+    		case 65:
+    			keymap.left = 1;
+    			$('#audio-run')[0].play();
+    			break;
+    		case 68:
+    			keymap.right = 1;
+    			$('#audio-run')[0].play();
+    			break;
+    		}
+    	}
+    	
+    	function event_key_up(e) {
+    		switch(e.keyCode) {
+    		case 32:
+    			keymap.jump = 0;
+    			break;
+    		case 65:
+    			keymap.left = 0;
+    			$('#audio-run')[0].pause();
+    			break;
+    		case 68:
+    			keymap.right = 0;
+    			$('#audio-run')[0].pause();
+    			break;
+    		}
+    	}
+    	
+    	function init() {
+    		var can = $('#game').get(0);
+    		gl = can.getContext('experimental-webgl');
+    		
+    		can.width = config.width;
+    		can.height = config.height;
+    		
+    		load_programs();
+    		load_textures();
+    		
+    		init_buffers();
+    		
+    		identity = mat4.create();
+    		modelview = mat4.create();
+    		projection = mat4.create();
+    		
+    		mat4.identity(identity);
+    		
+    		mat4.ortho(-(config.width/2), config.width/2, -(config.height/2), config.height/2, -10, 10, projection);
+    		
+    		gl.enable(gl.BLEND);
+    		gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
+    		
+    		load_level('school.js');
+    		
+    		var lvl = level_data;
+    		
+    		window.addEventListener('keydown', event_key_down, true);
+    		window.addEventListener('keyup', event_key_up, true);
+    		
+    		render();
+    	}
+    	
+    	function update() {
+    		var cellX = Math.floor(posX);
+    		var cellY = Math.floor(posY);
+    		// movement
+    		if (keymap.left == 1) {
+    			flip = 1;
+    			posX -= 0.05;
+    			if (posX < cellX && level_data.tiles[cellX -1][cellY][1] != 0) {
+    				posX = cellX;
+    			}
+    		}
+    		if (keymap.right == 1) {
+    			flip = 0;
+    			posX += 0.05;
+    			if (posX > cellX && level_data.tiles[cellX +1][cellY][1] != 0) {
+    				posX = cellX;
+    			}
+    		}
+    		// jump
+    		if (keymap.jump && !jumping) {
+    			if (posY - cellY < 0.1 && level_data.tiles[cellX][cellY +1][1] == 0) {
+    				jumping = true;
+    				jumpCell = cellY;
+    			}
+    		}
+    		// gravity
+    		if (jumping) {
+	    		posY += 0.05;
+	    		if (posY - jumpCell > 1.2) {
+	    			jumping = false;
+	    		}
+    			if (posY > (cellY + 0.5) && level_data.tiles[cellX][cellY +1][1] != 0) {
+    				posY = cellY;
+    			}
+    		} else {
+	    		posY -= 0.05;
+    			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0) {
+    				posY = cellY;
+    			}
+    		}
+    		mat4.identity(modelview);
+    		mat4.translate(modelview, [-posX, -posY, 0.0]);
+    	}
+    	
+    	function render() {
+    		requestAnimFrame(render);
+    		update();
+    		
+    		gl.viewport(0, 0, config.width, config.height);
+    		
+    		gl.clearColor(0.2, 0.7, 1.0, 1.0);
+    		gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    		
+    		if (loaded) {
+    			var x, y, z;
+		
+			gl.useProgram(programs.tile);
+    		
+    			gl.bindBuffer(gl.ARRAY_BUFFER, quadVBO);
+			gl.vertexAttribPointer(programs.tile.vposAttr, quadVBO.size, gl.FLOAT, false, 0, 0);
+			gl.uniform1i(programs.tile.samplerUniform, 0);
+			gl.uniformMatrix4fv(programs.tile.projectUniform, false, projection);
+			gl.uniformMatrix4fv(programs.tile.modelviewUniform, false, modelview);
+		
+			for (x = 0; x < level_data.tiles.length; x++) {
+				for (y = 0; y < level_data.tiles[x].length; y++) {
+					if (level_data.tiles[x][y][0] != 0) {
+						gl.bindTexture(gl.TEXTURE_2D, textures[tiles[level_data.tiles[x][y][0] -1]]);
+						gl.uniform3f(programs.tile.offsetUniform, x, y, -1);
+	    					gl.drawArrays(gl.TRIANGLES, 0, quadVBO.count);
+	    				}
+					if (level_data.tiles[x][y][1] != 0) {
+						gl.bindTexture(gl.TEXTURE_2D, textures[tiles[level_data.tiles[x][y][1] -1]]);
+						gl.uniform3f(programs.tile.offsetUniform, x, y, 0);
+	    					gl.drawArrays(gl.TRIANGLES, 0, quadVBO.count);
+	    				}
+	    			}
+	    		}	
+			
+			gl.uniformMatrix4fv(programs.tile.modelviewUniform, false, identity);
+			gl.uniform3f(programs.tile.offsetUniform, 0, 0, 0);
+			gl.uniform1f(programs.tile.flipUniform, flip);
+	    		gl.bindTexture(gl.TEXTURE_2D, textures[sprites.character.idle]);
+			gl.drawArrays(gl.TRIANGLES, 0, quadVBO.count);
+			gl.uniformMatrix4fv(programs.tile.modelviewUniform, false, modelview);
+			gl.uniform1f(programs.tile.flipUniform, 0.0);
+			
+			for (x = 0; x < level_data.tiles.length; x++) {
+				for (y = 0; y < level_data.tiles[x].length; y++) {
+					if (level_data.tiles[x][y][2] != 0) {
+						gl.bindTexture(gl.TEXTURE_2D, textures[tiles[level_data.tiles[x][y][2] -1]]);
+						gl.uniform3f(programs.tile.offsetUniform, x, y, 1);
+	    					gl.drawArrays(gl.TRIANGLES, 0, quadVBO.count);
+	    				}
+	    			}
+			}
+		
+	    		gl.useProgram(null);
+    		}
+    		
+    		gl.flush();
+    	}
+    	
+    	$(document).ready(function() { init(); });
+    </script>
+    <script id="level-script" type="text/javascript"></script>
+  </head>
+  <body>
+    <div id="gamearea">
+      <canvas id="game">
+      </canvas>
+      <div id="resources">
+        <audio id="audio-run" controls="none" preload="auto" loop>
+          <source src="snd/run.ogg" type="audio/ogg"/>
+          <source src="snd/run.wav" type="audio/wav"/>
+        </audio>
+        <img id="sprite-character-idle" src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhERIYmZzlAAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAANxJREFUOMtjZCACfK1k+A9jc7czMCLLMRLSgA2gG4KhGYYZGCD45c48
+OBtdPTaT4IrevXvDwMDAwCAkJILCRtbHhMUFDF8rEXyoBgw2TgO+OOQxUAr+v9yZh+Lvg7WCpIXB
+y52YrrhxZDGDhk0sg7j7JPxhgA3ANGMDjHi8gSGIbjs+Axiw+RebepwuCA0PZjA2NmJgYGBgcCmr
+ZugMD2ZYvXIthh4mXJoZGBgYzp49hyIBFf9PyAAUcPbsOYY9Xa2kpwVkHBoeTFo60DMxQxG4dOYU
+A0zs0plTKPoAg31dSTnGupwAAAAASUVORK5CYII="/>
+        <img id="tile-grass"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg0NLXNkhTIAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAilJREFUKM8FwUtuJEUQAND4ZWR9uu1mzMggITYsZ8eKEQdB4jocAK7D
+jgsgsUZiixjA2J6urqz8RATv4Q/Xn2oq6Ziz8DNeA3C15CcIjCXyAExPJG+yo7XhLV7k5x9/G7VZ
+G9y97XV6PENSFfp4u0kQDeMKfVHhsFuf5kxIMAFp4uY9XfKUFyhj+/CcNInwKI1UhBA1TeelZxbd
+w1GQAVyE5PXv5y44aYqXvSZcL3eEqdUNWCGkbpsExV52Os+iXJthHYshTAkARXLdO/tejuN+pZo7
+huF33zzeT/jLw1c5KwGa+fFyffP208OH7S0SfvvvH79++e7rP38nHw0Zv3//WUBwCiY+uj0s6a+r
+fb7ybhAOC8NrBXO4v8h/1z4lltMsh1smQI9Q2uq4n7n6MGfRlBKdU4cg7zEr1NLl6L0OOJ/l+dYT
+pn0YQnu8zGo+wJ9uXVnAi/fIKjIJIfKwVra2aiKoq6Yk+M+1tdb70amNdSFAHS4RUMpOy5refnJp
+qmP4cloM+63FJDE8RbAj7duw0QFHJ1QifvfFcrdwGDkHjg4B68KIK4IrBbCA5tM8iXUj3irTomkr
+AzDqPsBhzSzugZUSF5c4+qi1tWrBUcfDnZL3sL3ZgLPiS8OnvZnopBpgc5Z1DvECiCFymjP5oOL+
+0Zm8G+GiZCNh41bbJAxebw7FeLRBwHvtBioAotJPSW4A3Ryhl1ZJcXs5VMKA75b48OpZykCMcvwP
+wrRh8wO21jAAAAAASUVORK5CYII="/>
+        <img id="tile-dirt"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg4tOmd1mg4AAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAgRJREFUKM8FwVmOW1UQANCa32S70ySA+GMjLIbNg6JEaux+w52qinPw
+77/+2Gs3ma5S75tmjDZIlTrAdZTfftn2Kzl7ECJZ9Eo/jhZOTGNb9XLBiABAAgtntWx+0xSd3FPR
+AZKWaUpTQjxr06yO/JjxukJYjOHHOUoPU9+MhUiFSdFj9NJD0h8r/Tyg9HDCveUs9L5ZEJ8lr8F7
+y4igCPr2WD5LhKzXoMcUnqgIw2NvY/RBmMrw317aVZ4lqI2xl/K2aBu992EiZ0NCiPTew0Sq52h+
+v+GymkDINlvrVQUmxgAIIOWBQKthgPpoMRhnwZ5H99/fZtpbZPKzdsHgBMO0yTzDAVfhVBXOWYAl
+bxt8fw5aFBwgPOuIRrxXFxg2qTt83xsD3Cb62MdMeld8W5lqdSS6bfdEpkgzfqyz93Kb8GbJEB+X
+f7a+13o0dGQiorvRflQAuk/yZYZ/P06T6bOEqbzOJKa31V5XLsruLio0Yb9t81nOETSqv99nYnmn
+fNVxX+l0nDFpzc8Cq4YI5avpwtVW7cDrKiXSsr4aL0otoNXGq8ySJF7CpPd+OARNcfXnWR83SpCC
+ucwIoVcbXx7TcVQyvipMdFEN/botEZ3MtplzhLKapCHPcwz3o+bwVObu/s8rZJvgqFXNao9toRHS
+R7ktlpTPI/twrjGbKIMQ/fnr9D8Y8GpDK0FPDgAAAABJRU5ErkJggg=="/>
+        <img id="tile-concrete"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8tCzdp8AMAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAdlJREFUKM8FwUmiEzEMBUA9WZ46P/zbsWHD/VdAkm63NVGFn79+9zE9
+IjwKExd5vd5zDmbWvTOztgZAar3OUxgcCfOgjKS81lrX9f39g4swoGpc63VdEbHXJaWU2uTrMT+f
+D5hFJKWNOc1N1QEac0T4MbolFWmCMHdea/V5MAsliZQMF5H0zUThBmbPlMLIMIuIZHAJ0wyTWgm4
+18qIx+MJxjZX9UzKiNGb9EEMjghw8aD7vilTRF7v971vBhfQnFMKs9S9915nlcqUQaBSuNbKzAAd
+xwOUa11F5PN+eyJMPXKOeV+nqEWShiulE5hLhaua994IEKkR0Uf/8/efewDEx+zmQWBP9D4ZpGZt
+TBAVwMxqre5RmEspxIWve/dWmXL0fl6nu/c+bN+eYKljHqqKImP01hsA6a3dW5/HQ83SNAEPSqIM
+V91BBUR7nfu+x8Egkkyi8Nfn+vp6VGKkZzgRe1jhwQCRM6G1lhFSO9daAOpNtlplUGb4TtdSxE3v
+8w0gCASODNObP+d6Pp8szc1UlcB9TJYKEGVk5t7aq1BGuLmZCOO8jSmqlG2eqmutVlufQ80AEJF5
+FkYSZ4SwVBAh04PGGIWx965V3p/PcRx7nVwHQBoQqVzKf8uKVplYioTkAAAAAElFTkSuQmCC"/>
+        <img id="tile-hard-floor"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8SDPHTT5wAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAeVJREFUKM8Fwcl1FUEMAEBtvc182/mH4AMZkAFHCABHADbvz3RLLYkq
+fP/23d0AWDiO0a5rERMAji7PS5nZHcz09fUxpzKD/Pz1g4gy07a3wpEJgB7JhJkQ4YgM6YgQwCwi
+vz8+MnO7F+bIbLWspRF+qx29770BkZmL8JprR1JEQEZsq1W26ZxLTRGxt87MvTVEygSzfZ4HY5KU
+stY6z8fX5xdJKa2JVECKrYA01ZgI0xPoz9/PcZxiazLzfd/jfAAAhh/HUFWibmZVCIl2Eqa/vr2l
+O0V4rS0iMnOpkch9PTMiEnqrAHjfs7TBTKaqZiSlRXgpRW0j5LwvIAbECDczhOytuC1V9QhCJF2L
+WO45mdm2R2IVAUgmMtseYaaQkYCj1XEM6eNgxiKCCG8v571sqgoLYiI4ywAAKTUSljltJ/d9XTeL
+QMRcihCAaLqe11XqcN8eed+zlOJ7I7EgYhHOTJSathBRWAKxI2Q4cUmIWjgjem++TXybR7DUWLP3
+vsxiXq0PZ2ERVY3Iy1ZmMAsAEDO7u3sQ8VqzCZd+JKAHuHsppRTJyGMc4ziImGzv3tp5DiYgEpK6
+19R5CQFCRgQSny+PZdtUI1z23izl+e+TpSLhmnetAlTCdyKFO4QRMBEhZK31PzRXa2jeKQvSAAAA
+AElFTkSuQmCC"/>
+        <img id="tile-door-bottom"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8ZOUSUUnQAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAfRJREFUKM8t0inOVUEQBtCvqqu7b9/7/mEJIBEEjcGAYVMk7IuQoFAo
+gsLgMQTe0EMNCNjAUYd6jI/v3jCzM8McQNjUVHMYiNws1ePD958AXj+9e/v+k1SU5ZQ4JZserB6k
+UQRgCebR+8b91ZPHjGlzARAAyYJI+68rkaqjiYw5tsymnsx0LAjk9EAYwyEASmFnSEkr17tNupFN
+54pyKs10RLx8js9fQ1OqDAZw7jcAM9bd/W7G28a1lohkw9RXziWChlopOwAGsO8tldw4xVogs7Gc
+cA7ugOV9Lb2MOFpiv90unQEs59F1mgWIUp7uW+qPlY4CTIXOVshWWEg7NgaQ4O6T3YOScJTcdNDF
+/Hb1FQ7Zp6utCHbtkwHkreTcWOr1OtR99oG8b0z1qBJmeuMVrRUQyVYYwOqdPHzOLPC1KLFGH8vm
+uFHJUqpUOfcuoIALgCBxG1xyyYzILfPqpua17U7LArfFWVgRS5kBEEtOefYJ8AzoWh0kOU2dqhCW
+lh1EPqwIBECf3UvmJC+epdAuuajFOJ/bqS1axc7XUcApif6vsW01mdL98eWb1br//tPrkYUeLj8c
+6qdjN8AN/3QBAHMNCiaCj2l1Y9HQcIaVUxkWEZopOWUAfL6OSjPDE6jWRJwoSKHgCCfVVN1N2Sky
+ohv+AjmmUJf3i5L3AAAAAElFTkSuQmCC"/>
+        <img id="tile-door-top"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8aB67YHBwAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAehJREFUKM+NzTuuFFcURuF/P86jqq4bMyJLjj0gAnJC5kJC4MQSEsNg
+AESoq/vWeeyzN4EZACv/tKhFL8j47SgiPr3/S1QlhgebB9lMtYIomK/HWUs1SMJY0//58FUByIrt
+73fMXkp5Pp+lpFrfmJ1m9Dalx+PHn/vNzF8/v+8OBpAz56wRmNNut1vvdr9/Z67XdZmNfX87J4hi
+ihQGA3i0a84JSEphNoCV0sv9fk9pV81rXdtWIpDzDoAB7PumKiLjPPucUusegdvtD2Z7PnsEzdnW
+IvbrejYGMJ3dfS0ppcz5jGCRAGTOVYpEuHsch6zQ7agMQOCqOSXdtkOEctaIGOORErmjFCWavVuw
+WxsMINXc+wnQeZ77vrd2mWFOY/7/ibV4jAEirVkBzNZe0pYSR9B5NiLKGWtldxujb1tqzZjZQQFn
+AEFKxGPMtULVj2NXrcdR3TUlva7FLBHTENNYARCriLW2cs5AmXP23pg1pWRmRKRqran3lRUMoI3W
++xRJRNmsXdfrthWRvNaIiN4v95QSixoABVBrWWtFtDn9OPacAwDzACRi5PwSIRGdoL8AlvcvH8MX
+UwxS0NJgi5hr5aprIcISxDkB4MdrLzQSXEClCLFQkMHAEU5mUtz/+/b899s9IdrCT0lBRozHdJEC
+AAAAAElFTkSuQmCC"/>
+        <img id="tile-locker"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8mErD2gQgAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAEFJREFUOMtjLJp//v+hY1cZyAFvnj5mYGKgEAy8ASzoAnZW2ng1oIcX
+hgHrVu/Aa4CItCx+A9AVjHphKHhhGOQFAEovGR2M4TI7AAAAAElFTkSuQmCC"/>
+        <img id="tile-steps"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8wCSYL/TMAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAe1JREFUOMuNk72uHkUQRM9098zs7uUVAMmkYFl+EUsEvCRIIF6AmITA
+To15Ba6uP+/OT08TXCQi+KiooqOSqir98NMvsXzg7tSitJFIKUgEOWfmnOnHn7/n32Rv3/2KiLJ8
+MOZiRVByxlT55uvX3JO9//0DIsIcnVw2zk836n7wxedf0ocj6b8BEhGMMbB60NqF5cLsF7UaW7kb
+4B9A+ERVSQlEhDUHvtJ9gCY4jp3WGz4nrV2oZSKC6XYfcA1HkhI+ETVq3TlbZ/rC7H8kOLaCr4Va
+RiSxAooZZkbv/X4LT7eTfat89nDQxiTcuXojlpMYqNb49s13+FpkTahVIha3W2OrCdu3SgT8+fjI
+fjwgKdhrJYny9t1vRFKyKWsFpESQkNWxevD65StsRaCSqKXQrxO1jJaN9x/++LsRpbcLU0VU+HQ2
+asm8ePEV5zURTQmzDJKp+wMpJT4+PZJiMcdg9E4pmViOr6CWTB8DVcXnQESN82psRVlrse8bxZQF
+LB+IJFrrzIDZG6JKNiOJIhKIqmAq9On4nIwx8RWoKLnuuDs5F2qtxFr4dEopXLcnkhhGLAJY7tRa
+GL09L9Endd8ZsVixOG8n234AMMag1AoI0sdENONz8OwNVaGUjM8JVoBg2yqqRiTB/flkqspf9KwO
+po55E8QAAAAASUVORK5CYII="/>
+        <img id="tile-ceiling"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAA3NCSVQICAjb4U/gAAAB30lEQVQo
+kSXLN2IQSRAAwLZjViBxL9A94Aj5CBEJ/48FrJlpR3CVF37/8bOP6fthaUgEVUwApBkOSBkBUCps
+UYyFxCQiWPny+Y0JoaCPubev+4QqrCBCFkWWzCzAvbeoyP08FsCEVZ6+pQ8EMHNhJKLMOK/rOCaJ
+ZJZEBDMzU4aPMZZZ2u5jMgEz770zCwmv+2IWABAW5cqq5D5sL0aUcURGhQeAaIvIplyZgBhuVFXm
+UYDlBkgF4OFh9pgjcYZl2H0/gPg8C1mJWY5jhjsQjd4KCKq09ZfjsH0zCxPOOcyMRSqDnvuKSHOv
+go/fZ2WM1gCyqgo43CLcbbt7Vx6jS+s9w+cYHqHChLXdCTEyVIWgiFoBItS9Nm8jt0XEZtZUCnDM
+AzKgiohVtQCfZay9tcZEWUVEvPciIkTsTdN9Hi9IRAjP2gA157B1R6S21lRJ+4iIOed9/jH3Ir6u
+OyL2elR1e0YkVBbyr48PJCI3672f55/Xt9d0s7XcN1SSNKgcTSOzkBHyny9v93UKEVUVie7toq03
+xYWZ8eyHcLg7IBKxipznFYXy7/v7/8c8unJWAWBkMWEVZAYiQwUiJDCLyNf/vkUYAAvnMft1LWIC
+wDnkvDYzR4DZfn399DybGf4C+FtnJ3J2nkIAAAAASUVORK5CYII="/>
+      </div>
+    </div>
+    <div id="infoarea">
+    </div>
+  </body>
+</html>

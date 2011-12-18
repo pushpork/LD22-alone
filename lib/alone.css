@@ -1,0 +1,11 @@
+body {
+  background:#000000;
+}
+
+#gamearea {
+  text-align:center;
+}
+
+#resources {
+  display:none;
+}
