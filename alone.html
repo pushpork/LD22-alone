@@ -65,6 +65,7 @@ void main(void) {
     	var jumpCell = 0;
     	var flip = 0;
     	var game_over = false;
+    	var score = 0
     	
     	var keymap = {
     		left: 0,
@@ -209,6 +210,7 @@ void main(void) {
     	function load_textures() {
     		sprites.character.idle = insert_texture('sprite-character-idle');
 		
+		
 		tiles[0] = insert_texture('tile-grass');
 		tiles[1] = insert_texture('tile-dirt');
 		tiles[2] = insert_texture('tile-trunk');
@@ -223,6 +225,9 @@ void main(void) {
 		tiles[15] = insert_texture('tile-steps');
 		tiles[16] = insert_texture('tile-ceiling');
 		tiles[17] = insert_texture('tile-concrete-bright');
+		
+		// pickups
+		tiles[63] = insert_texture('tile-homework');
 		
 		fetch_textures();
     	}
@@ -309,21 +314,36 @@ void main(void) {
     			flip = 1;
     			posX -= 0.05;
     			if (posX < cellX && level_data.tiles[cellX -1][cellY][1] != 0) {
-    				posX = cellX;
+    				if (level_data.tiles[cellX +1][cellY][1] > 63) {
+    					level_data.tiles[cellX +1][cellY][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    				} else {
+    					posX = cellX;
+    				}
     			}
     		}
     		if (keymap.right == 1) {
     			flip = 0;
     			posX += 0.05;
     			if (posX > cellX && level_data.tiles[cellX +1][cellY][1] != 0) {
-    				posX = cellX;
+    				if (level_data.tiles[cellX +1][cellY][1] > 63) {
+    					level_data.tiles[cellX +1][cellY][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    				} else {
+    					posX = cellX;
+    				}
     			}
     		}
     		// jump
     		if (keymap.jump && !jumping) {
-    			if (posY - cellY < 0.1 && level_data.tiles[cellX][cellY +1][1] == 0 && level_data.tiles[cellX][cellY -1][1] != 0) {
-    				jumping = true;
-    				jumpCell = cellY;
+    			if (posY - cellY < 0.1) {
+    				if ((level_data.tiles[cellX][cellY +1][1] == 0 && level_data.tiles[cellX][cellY -1][1] != 0) ||
+    				    ((posX - cellX > 0.2) && level_data.tiles[cellX +1][cellY +1][1] == 0 && level_data.tiles[cellX +1][cellY -1][1] != 0)) {
+	    				jumping = true;
+    					jumpCell = cellY;
+    				}
     			}
     		}
     		// gravity
@@ -331,16 +351,16 @@ void main(void) {
     			if (keymap.left || keymap.right)
     				$('#audio-run')[0].pause();
     				
-	    		posY += 0.05;
-	    		if (posY - jumpCell > 1.5)
+	    		posY += 0.1;
+	    		if (posY - jumpCell > 2.2 || (posY >= cellY && (level_data.tiles[cellX][cellY +1][1] != 0 || ((posX - cellX > 0.2) && (level_data.tiles[cellX +1][cellY +1][1] != 0)))))
 	    			jumping = false;
-    			if (posY > (cellY + 0.5) && level_data.tiles[cellX][cellY +1][1] != 0)
+    			if (posY > cellY && (level_data.tiles[cellX][cellY +1][1] != 0) || ((posX - cellX > 0.2) && (level_data.tiles[cellX +1][cellY +1][1] != 0)))
     				posY = cellY;
     		} else {
     			if ((keymap.left || keymap.right) && posY - cellY < 0.1 && level_data.tiles[cellX][cellY -1][1] != 0) {
     				//$('#audio-run')[0].play();
     			}
-	    		posY -= 0.05;
+	    		posY -= 0.1;
     			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0)
     				posY = cellY;
     			if ((posX - cellX) > 0.1 && posY < (cellY)) {
@@ -441,6 +461,18 @@ OBtdPTaT4IrevXvDwMDAwCAkJILCRtbHhMUFDF8rEXyoBgw2TgO+OOQxUAr+v9yZh+Lvg7WCpIXB
 y52YrrhxZDGDhk0sg7j7JPxhgA3ANGMDjHi8gSGIbjs+Axiw+RebepwuCA0PZjA2NmJgYGBgcCmr
 ZugMD2ZYvXIthh4mXJoZGBgYzp49hyIBFf9PyAAUcPbsOYY9Xa2kpwVkHBoeTFo60DMxQxG4dOYU
 A0zs0plTKPoAg31dSTnGupwAAAAASUVORK5CYII="/>
+
+        <img id="tile-homework" src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhQhBBsQ7g8AAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAWNJREFUOMudU81Kw0AYnDVWCCI5iAcPIZ76AL6CiHgs+A6+iuAD6cFa
+oaAihR4EA4IePBht/aXmd7cZD3G3SVqlOLCHnd2Z+fZjP2A2tgGwtDYANDAnlgEwZkaSZPRijGzb
+bgFw/1Q7jrMHgJ2TYwIoTGRCksbIdd1DALsA1ur6VSMi2e5cGBFjZXjNeZ53IGoGVEohl8SS3UBx
+F1DI0RBWceGHAwAhBBZLYhcALMvCYBCAJIQQRjT8esPD7ROEEBWTSvr9jW9K7Ha7DIKAMpuUTJIp
+SX4kmpuINYK7x8o7NV7DsLIvGyzogzgtDiTjovlqNGUUMdKcY9KjiFR8Z5KSisqIUhad7131in1O
+yjGnyvfKKXEueXl+xpFMKulZltG/9jXXnPX7durllt/r9/sMY5MufvuIKwBa2iSPyKP2KUOG5cZt
+zTMP67qa4fOYn6FkLDnVvHnQrE3lPv6JzdJYV/AN029h+pWMq44AAAAASUVORK5CYII="/>
+
         <img id="tile-grass"  src="data:image/png;base64,
 iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
 EwAACxMBAJqcGAAAAAd0SU1FB9sMEg0NLXNkhTIAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
@@ -591,6 +623,12 @@ KnLt+X2MMoOIj4Uwjc73PYhwncxEdxOR8OeZMwojsrfxFziLY7h7Z8WNAAAAAElFTkSuQmCC"/>
       </div>
     </div>
     <div id="infoarea">
+      <div id="scoreboard">
+        score: <span id="score">0</span>
+      </div>
+      <div>
+      Your friends have run off without you! You're all alone. But they dropped their homework as they ran, follow the paper trail and see if you can catch up.
+      </div>
     </div>
   </body>
 </html>

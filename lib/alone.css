@@ -1,5 +1,7 @@
 body {
   background:#000000;
+  color:#ffffff;
+  font:12px sans;
 }
 
 #gamearea {
@@ -12,4 +14,9 @@ body {
 
 #winner {
   color:#ffffff;
+}
+
+#scoreboard {
+  font-weight:bold;
+  font-size:1.2em;
 }
