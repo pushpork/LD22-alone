@@ -58,11 +58,13 @@ void main(void) {
     	var tiles = new Array();
     	var level_data;
     	var loaded = false;
+    	var level_end = 0;
     	var posX = 0.0;
     	var posY = 0.0;
     	var jumping = false;
     	var jumpCell = 0;
     	var flip = 0;
+    	var game_over = false;
     	
     	var keymap = {
     		left: 0,
@@ -167,6 +169,8 @@ void main(void) {
 		gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, texture.img[0]);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+		gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 		gl.bindTexture(gl.TEXTURE_2D, null);
 	}
 
@@ -207,6 +211,8 @@ void main(void) {
 		
 		tiles[0] = insert_texture('tile-grass');
 		tiles[1] = insert_texture('tile-dirt');
+		tiles[2] = insert_texture('tile-trunk');
+		tiles[3] = insert_texture('tile-leaves');
 		
 		// school tiles
 		tiles[10] = insert_texture('tile-concrete');
@@ -216,6 +222,7 @@ void main(void) {
 		tiles[14] = insert_texture('tile-locker');
 		tiles[15] = insert_texture('tile-steps');
 		tiles[16] = insert_texture('tile-ceiling');
+		tiles[17] = insert_texture('tile-concrete-bright');
 		
 		fetch_textures();
     	}
@@ -236,11 +243,11 @@ void main(void) {
     			break;
     		case 65:
     			keymap.left = 1;
-    			$('#audio-run')[0].play();
+    			//$('#audio-run')[0].play();
     			break;
     		case 68:
     			keymap.right = 1;
-    			$('#audio-run')[0].play();
+    			//$('#audio-run')[0].play();
     			break;
     		}
     	}
@@ -314,13 +321,16 @@ void main(void) {
     		}
     		// jump
     		if (keymap.jump && !jumping) {
-    			if (posY - cellY < 0.1 && level_data.tiles[cellX][cellY +1][1] == 0) {
+    			if (posY - cellY < 0.1 && level_data.tiles[cellX][cellY +1][1] == 0 && level_data.tiles[cellX][cellY -1][1] != 0) {
     				jumping = true;
     				jumpCell = cellY;
     			}
     		}
     		// gravity
     		if (jumping) {
+    			if (keymap.left || keymap.right) {
+    				$('#audio-run')[0].pause();
+    			}
 	    		posY += 0.05;
 	    		if (posY - jumpCell > 1.2) {
 	    			jumping = false;
@@ -329,10 +339,18 @@ void main(void) {
     				posY = cellY;
     			}
     		} else {
+    			if ((keymap.left || keymap.right) && posY - cellY < 0.1 && level_data.tiles[cellX][cellY -1][1] != 0) {
+    				//$('#audio-run')[0].play();
+    			}
 	    		posY -= 0.05;
     			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0) {
     				posY = cellY;
     			}
+    		}
+    		
+    		if (cellX >= level_end) {
+    			game_over = true;
+    			$('#winner').show();
     		}
     		mat4.identity(modelview);
     		mat4.translate(modelview, [-posX, -posY, 0.0]);
@@ -340,7 +358,9 @@ void main(void) {
     	
     	function render() {
     		requestAnimFrame(render);
-    		update();
+    		if (loaded && !game_over) {
+	    		update();
+	    	}
     		
     		gl.viewport(0, 0, config.width, config.height);
     		
@@ -403,10 +423,11 @@ void main(void) {
   </head>
   <body>
     <div id="gamearea">
+      <h1 id="winner" style="display:none">WINNER!</h1>
       <canvas id="game">
       </canvas>
       <div id="resources">
-        <audio id="audio-run" controls="none" preload="auto" loop>
+        <audio id="audio-run" controls="none" preload="auto">
           <source src="snd/run.ogg" type="audio/ogg"/>
           <source src="snd/run.wav" type="audio/wav"/>
         </audio>
@@ -445,6 +466,34 @@ f7a+13o0dGQiorvRflQAuk/yZYZ/P06T6bOEqbzOJKa31V5XLsruLio0Yb9t81nOETSqv99nYnmn
 fNVxX+l0nDFpzc8Cq4YI5avpwtVW7cDrKiXSsr4aL0otoNXGq8ySJF7CpPd+OARNcfXnWR83SpCC
 ucwIoVcbXx7TcVQyvipMdFEN/botEZ3MtplzhLKapCHPcwz3o+bwVObu/s8rZJvgqFXNao9toRHS
 R7ktlpTPI/twrjGbKIMQ/fnr9D8Y8GpDK0FPDgAAAABJRU5ErkJggg=="/>
+        <img id="tile-trunk"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhIHAawp5RYAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAWVJREFUKM9NkjGOVDEQROuVPYyWK3IhDsOZEBEkJCuxiJ1vVxF4kHDY
+6na/VzZfPn/6+uPb959vw+qW7L3ep3t/+fj7T609b76uvP5a18rr28Mf5qhUKa0kVR4DExEhaYed
+IqVae1sSAEoKamWw3bY9laYFgLa+du1ha+2itrI9PPaO2kqtBMMMC8mPFY8zENFINnOO7EqRJBUY
+Zg5AfqyAgUTQFJAZafS0Kgj03PB01eGmbatI6DAL0L8DuNCk8v3DSEmbnWtlznE6bVTt9NxsoNkJ
+L/db6jR753Ht25wG1JPYSneEeA603G+jtdSk19pjGJ7GrfbugZ+nqgqOiSolPcRPdDXHBtmqDXTt
+oN4GwEBr7SOQBKk9MWiaesjK+yWjOZ0Ucj0uoWGuHaNK9n8brFzXht4mwDRrrUOVBApnwUnpRC5J
+NfTZ1+Nw4H1+leQy126laSq1XbtCxep5fiSNOZok+gscEhn0kVg1cwAAAABJRU5ErkJggg=="/>
+        <img id="tile-leaves"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhISLjBNPlsAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAtRJREFUOMs100tuHFUYgNHvPqu6qlLdTnAwyIktHBFGEYIJGTJgwCBm
+iMQeQF6KBTuJF8AOkogBg0iJ7TwMwXa77aqu5637M4Gzh6P4z9f7ez8br35tqh6DRlvD0I3ktxNi
+FAiKEAJhnPCp/eXZ0+PfABTA4x8fStN2bO1tE/qJ1M+IakREIQJDF8iSBFtq+mrk9I/XKNT+n7+/
+O1JffPup3P9yF5Tw5Ic9soWmvvmbk7cnrNprIi1J6pApIr1nGCyr0885fvEK49i1zlu0GB5/Z6nj
+Kz68HBnsSMsF1llkSjE6YCysp0ieGN5VDWnpMEYfWGM1RgydOuXqIlDXNSaZ6BvNLGvoBkVhM0Kb
+kec91SriUkd10eFT85N2mSGKsLy8QsZIZKSpDcZEhnWCiCbxCz7aLsldSZ4HPn7wmt1He2hl79r1
+smf7gaNbGaa8JnWe1Dnc3CGVRpmeGCcWfougr0njyGhrogkYr9BpmlCvGvy8Jy0M62bAeEUuc8r5
+Fom+Q1YUSITNuyWzRU6yABk0zU2HnQiIE0SlrJct3uYU2S028x1sGvkgK5q2Rk8G5zTia+hHCGCd
+wbZVj0sd2tZI4sizGblskJSRm+qcatURsppmtSbaDHRNtEAa8TOHLW/nTP3E1DnGQdOZK5rc016e
+8/5txTzLMF2BKyP1dUvXD5gMrDhQgp0koBBkzGAa6OvIebckJoqy1KjRsSgXrPt/MMZgzIzYavpu
+JEbBbNwrFjdn1TcSdyg3B9J8wpWBsRvx2iN5ZFIa6QOXVy2xnnPybIurv86IQR3qNPGHs3mCDIq2
+LugrRRwVidMMURHWPe1wAy5SFrdYvrlHUWZoHAZ9qAC+2v/siUI/NR42PtnCOI1PUiYZqC5b5ncy
+JCq6duDs5RtmWUIIYf/50fGR+r/zo+/v74xtPHCFOVBKgYAEwWjLpEessigNghxKlMPnRyenAP8C
+St5qlBmqyLIAAAAASUVORK5CYII="/>
+
         <img id="tile-concrete"  src="data:image/png;base64,
 iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
 EwAACxMBAJqcGAAAAAd0SU1FB9sMEg8tCzdp8AMAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
@@ -525,6 +574,18 @@ AzKgiohVtQCfZay9tcZEWUVEvPciIkTsTdN9Hi9IRAjP2gA157B1R6S21lRJ+4iIOed9/jH3Ir6u
 OyL2elR1e0YkVBbyr48PJCI3672f55/Xt9d0s7XcN1SSNKgcTSOzkBHyny9v93UKEVUVie7toq03
 xYWZ8eyHcLg7IBKxipznFYXy7/v7/8c8unJWAWBkMWEVZAYiQwUiJDCLyNf/vkUYAAvnMft1LWIC
 wDnkvDYzR4DZfn399DybGf4C+FtnJ3J2nkIAAAAASUVORK5CYII="/>
+        <img id="tile-concrete-bright"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhErGYQyqLcAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAdlJREFUKM8FwVkSGycUAMC3AqOR7PufwpX/HCoVWwzwNnfjr3/+/e//
+57peysFMx5HRifvxxHIVApS9V288n/16DXq2fd7v18BI+D6BUGZuZ+717b2vk2bGTHMVAEMV3Vcb
+gywoM3tjgCIWT23av/MIo3DacWa478sjyYPW2ginN0HIrPp+F5RVZUaec46hqGY4QLiXnHNEX5Xf
+LPQkwhyjIRYRqlKmXkPMDqIeA3OnAgqfxymr1jOZoPeGoCwDQFR1LS94mePz7N6aEBxExMLniTG6
+mUeGKs/v79bG3tG0EBaT68BjRqxXFWq7Pj9+VjqSIBbS9X7fiMl0iCiLIqCAAZkySkTmnGF/RFtr
+HOERa69JJKJvjwDsoo1Y3Ut6h2MsUhbAlOdEJgEUIGd6RLZ+Z8y9Q6QRJUVUU84CFTwWSPh5y2u0
+TGDm3tte81iOLk3hfXdxN0QiIiJFOJXgReaW5VW0tjFCa20fR4TWhFS7mTVJovp87ohABMQa/SIE
+1R6ZgDzGIKYqEEJvSn/mQQSiQmQiXtuFDog2VSx3d6isqj6GRDJAqnABZSZzmfl9sQdn5tm79Sur
+KnLt+X2MMoOIj4Uwjc73PYhwncxEdxOR8OeZMwojsrfxFziLY7h7Z8WNAAAAAElFTkSuQmCC"/>
       </div>
     </div>
     <div id="infoarea">
