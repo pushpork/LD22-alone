@@ -328,24 +328,26 @@ void main(void) {
     		}
     		// gravity
     		if (jumping) {
-    			if (keymap.left || keymap.right) {
+    			if (keymap.left || keymap.right)
     				$('#audio-run')[0].pause();
-    			}
+    				
 	    		posY += 0.05;
-	    		if (posY - jumpCell > 1.2) {
+	    		if (posY - jumpCell > 1.5)
 	    			jumping = false;
-	    		}
-    			if (posY > (cellY + 0.5) && level_data.tiles[cellX][cellY +1][1] != 0) {
+    			if (posY > (cellY + 0.5) && level_data.tiles[cellX][cellY +1][1] != 0)
     				posY = cellY;
-    			}
     		} else {
     			if ((keymap.left || keymap.right) && posY - cellY < 0.1 && level_data.tiles[cellX][cellY -1][1] != 0) {
     				//$('#audio-run')[0].play();
     			}
 	    		posY -= 0.05;
-    			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0) {
+    			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0)
     				posY = cellY;
-    			}
+    			if ((posX - cellX) > 0.1 && posY < (cellY)) {
+    				if (level_data.tiles[cellX +1][cellY -1][1] != 0) {
+	    				posY = cellY;
+	    			}
+	    		}
     		}
     		
     		if (cellX >= level_end) {
