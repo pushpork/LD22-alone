@@ -226,6 +226,9 @@ void main(void) {
 		tiles[16] = insert_texture('tile-ceiling');
 		tiles[17] = insert_texture('tile-concrete-bright');
 		
+		tiles[20] = insert_texture('tile-friend1');
+		tiles[21] = insert_texture('tile-friend2');
+		
 		// pickups
 		tiles[63] = insert_texture('tile-homework');
 		
@@ -314,10 +317,11 @@ void main(void) {
     			flip = 1;
     			posX -= 0.05;
     			if (posX < cellX && level_data.tiles[cellX -1][cellY][1] != 0) {
-    				if (level_data.tiles[cellX +1][cellY][1] > 63) {
-    					level_data.tiles[cellX +1][cellY][1] = 0;
+    				if (level_data.tiles[cellX -1][cellY][1] > 63) {
+    					level_data.tiles[cellX -1][cellY][1] = 0;
     					score++;
     					$('#score').text(score);
+    					$('#audio-paper')[0].play();
     				} else {
     					posX = cellX;
     				}
@@ -331,6 +335,7 @@ void main(void) {
     					level_data.tiles[cellX +1][cellY][1] = 0;
     					score++;
     					$('#score').text(score);
+    					$('#audio-paper')[0].play();
     				} else {
     					posX = cellX;
     				}
@@ -339,8 +344,8 @@ void main(void) {
     		// jump
     		if (keymap.jump && !jumping) {
     			if (posY - cellY < 0.1) {
-    				if ((level_data.tiles[cellX][cellY +1][1] == 0 && level_data.tiles[cellX][cellY -1][1] != 0) ||
-    				    ((posX - cellX > 0.2) && level_data.tiles[cellX +1][cellY +1][1] == 0 && level_data.tiles[cellX +1][cellY -1][1] != 0)) {
+    				if ((level_data.tiles[cellX][cellY +1][1] == 0 && level_data.tiles[cellX][cellY -1][1] != 0 && level_data.tiles[cellX][cellY -1][1] < 64) ||
+    				    ((posX - cellX > 0.2) && level_data.tiles[cellX +1][cellY +1][1] == 0 && level_data.tiles[cellX +1][cellY -1][1] != 0 && level_data.tiles[cellX +1][cellY -1][1] < 64)) {
 	    				jumping = true;
     					jumpCell = cellY;
     				}
@@ -352,20 +357,75 @@ void main(void) {
     				$('#audio-run')[0].pause();
     				
 	    		posY += 0.1;
-	    		if (posY - jumpCell > 2.2 || (posY >= cellY && (level_data.tiles[cellX][cellY +1][1] != 0 || ((posX - cellX > 0.2) && (level_data.tiles[cellX +1][cellY +1][1] != 0)))))
+	    		if (posY - jumpCell > 2.2)
 	    			jumping = false;
-    			if (posY > cellY && (level_data.tiles[cellX][cellY +1][1] != 0) || ((posX - cellX > 0.2) && (level_data.tiles[cellX +1][cellY +1][1] != 0)))
-    				posY = cellY;
+	    			
+	    		if (posY >= cellY && level_data.tiles[cellX][cellY +1][1] != 0) {
+	    			if (level_data.tiles[cellX][cellY +1][1] > 63) {
+    					level_data.tiles[cellX][cellY +1][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    					$('#audio-paper')[0].play();
+	    			} else {
+		    			jumping = false;
+		    		}
+	    		}
+	    		if ((posX - cellX > 0.2) && (level_data.tiles[cellX +1][cellY +1][1] != 0)) {
+	    			if (level_data.tiles[cellX +1][cellY +1][1] > 63) {
+    					level_data.tiles[cellX][cellY +1][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    					$('#audio-paper')[0].play();
+	    			} else {
+		    			jumping = false;
+		    		}
+	    		}
+	    			
+    			if (posY > cellY && level_data.tiles[cellX][cellY +1][1] != 0) {
+	    			if (level_data.tiles[cellX][cellY +1][1] > 63) {
+    					level_data.tiles[cellX][cellY +1][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    					$('#audio-paper')[0].play();
+	    			} else {
+		    			posY = cellY;
+		    		}
+    			}
+    			if (posX - cellX > 0.2 && level_data.tiles[cellX +1][cellY +1][1] != 0) {
+	    			if (level_data.tiles[cellX][cellY +1][1] > 63) {
+    					level_data.tiles[cellX][cellY +1][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    					$('#audio-paper')[0].play();
+	    			} else {
+		    			posY = cellY;
+		    		}
+    			}
     		} else {
     			if ((keymap.left || keymap.right) && posY - cellY < 0.1 && level_data.tiles[cellX][cellY -1][1] != 0) {
     				//$('#audio-run')[0].play();
     			}
 	    		posY -= 0.1;
-    			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0)
-    				posY = cellY;
+    			if (posY < cellY && level_data.tiles[cellX][cellY -1][1] != 0) {
+    				if (level_data.tiles[cellX][cellY -1][1] > 63) {
+    					level_data.tiles[cellX][cellY -1][1] = 0;
+    					score++;
+    					$('#score').text(score);
+    					$('#audio-paper')[0].play();
+	    			} else {
+		    			posY = cellY;
+		    		}
+    			}
     			if ((posX - cellX) > 0.1 && posY < (cellY)) {
     				if (level_data.tiles[cellX +1][cellY -1][1] != 0) {
-	    				posY = cellY;
+    					if (level_data.tiles[cellX +1][cellY -1][1] > 63) {
+    						level_data.tiles[cellX +1][cellY -1][1] = 0;
+    						score++;
+    						$('#score').text(score);
+    						$('#audio-paper')[0].play();
+		    			} else {
+			    			posY = cellY;
+		    			}
 	    			}
 	    		}
     		}
@@ -373,6 +433,8 @@ void main(void) {
     		if (cellX >= level_end) {
     			game_over = true;
     			$('#winner').show();
+    			$('#audio-background')[0].pause();
+    			alert("Game Over. You've Won!\nYour score was: "+score);
     		}
     		mat4.identity(modelview);
     		mat4.translate(modelview, [-posX, -posY, 0.0]);
@@ -444,14 +506,23 @@ void main(void) {
     <script id="level-script" type="text/javascript"></script>
   </head>
   <body>
+    <h1>Wait up guys...</h1>
     <div id="gamearea">
       <h1 id="winner" style="display:none">WINNER!</h1>
       <canvas id="game">
       </canvas>
       <div id="resources">
+        <audio id="audio-background" controls="none" preload="auto" autoplay="autoplay" loop="loop">
+          <source src="snd/background.ogg" type="audio/ogg"/>
+          <source src="snd/background.wav" type="audio/wav"/>
+        </audio>
         <audio id="audio-run" controls="none" preload="auto">
           <source src="snd/run.ogg" type="audio/ogg"/>
           <source src="snd/run.wav" type="audio/wav"/>
+        </audio>
+        <audio id="audio-paper" controls="none" preload="auto">
+          <source src="snd/paper.ogg" type="audio/ogg"/>
+          <source src="snd/paper.wav" type="audio/wav"/>
         </audio>
         <img id="sprite-character-idle" src="data:image/png;base64,
 iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
@@ -620,6 +691,23 @@ HOERa69JJKJvjwDsoo1Y3Ut6h2MsUhbAlOdEJgEUIGd6RLZ+Z8y9Q6QRJUVUU84CFTwWSPh5y2u0
 TGDm3tte81iOLk3hfXdxN0QiIiJFOJXgReaW5VW0tjFCa20fR4TWhFS7mTVJovp87ohABMQa/SIE
 1R6ZgDzGIKYqEEJvSn/mQQSiQmQiXtuFDog2VSx3d6isqj6GRDJAqnABZSZzmfl9sQdn5tm79Sur
 KnLt+X2MMoOIj4Uwjc73PYhwncxEdxOR8OeZMwojsrfxFziLY7h7Z8WNAAAAAElFTkSuQmCC"/>
+
+        <img id="tile-friend1"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhcQM2e28usAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAOpJREFUOMudkjEKwkAQRV+CFzAKXsFCrMTK3gOIWHmFtFaWNpZewSqI
+BwikEazEpAgpcgGLgPEEwtgYXZLVrH4Y+Az/7878XYsS8gQpeKuHRQ2sT2YdTA4EEEAy35WC58m7
+yuJG2Xy7XQFwnDYqzxP9bXa54ThtLf8Emx9wv7gYZ3BYNkXNQ8nkewaZ75Iet3RHczKf/1bojuak
+x63RuLp3lcyv7toZb7R660sORlrtBNPZhIW3J1ivAAjDiJ231+ptnVlFGEYAPPti/A+C9epl/hXy
+nOT1D5SqzUD6gyEA8flEwQvE51PF8wDo8mGKbFb3HAAAAABJRU5ErkJggg=="/>
+        <img id="tile-friend2"  src="data:image/png;base64,
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAlwSFlzAAAL
+EwAACxMBAJqcGAAAAAd0SU1FB9sMEhcSCZOMSdsAAAAdaVRYdENvbW1lbnQAAAAAAENyZWF0ZWQg
+d2l0aCBHSU1QZC5lBwAAAO9JREFUOMudkjEKwkAQRV8Sa8EgeALBykqsUqWxFhUrLxAhrZV4Bwsv
+YCXiAdIIgpUYCys7sQyIN5CxMWGJq65+GPgM/+/O/h2LHALfkZTP1neLL7DemXUwORBAAEmiUFIe
++E5WeXEhb77drgC4bhmVB76jvc3ON1y3rOXvYPMDJqMhxhlsxiVR81Ay+ZxBEoWctnNq3oAk4r8n
+1LwBp+3caFzdv0oShS/NSmuq1VsfcjDSaifo9Tuci2261QsAcXxguVhp9bbOrCKODwA8+2K8B93q
+JTP/CnlOku2BUl8zkHqjCcBxvyPlKY773YvnASaVXOPaLxZpAAAAAElFTkSuQmCC"/>
       </div>
     </div>
     <div id="infoarea">
@@ -627,7 +715,16 @@ KnLt+X2MMoOIj4Uwjc73PYhwncxEdxOR8OeZMwojsrfxFziLY7h7Z8WNAAAAAElFTkSuQmCC"/>
         score: <span id="score">0</span>
       </div>
       <div>
-      Your friends have run off without you! You're all alone. But they dropped their homework as they ran, follow the paper trail and see if you can catch up.
+        <a href="#" onclick="$('#audio-background')[0].pause(); return false;">pause music</a> /
+        <a href="#" onclick="$('#audio-background')[0].play(); return false;">resume music</a>
+      </div>
+      <div>
+        Your friends have run off without you! You're all alone. But they dropped their homework as they ran, follow the paper trail and see if you can catch up.
+        <br/>
+        controls: A/D to move. [space] to jump
+      </div>
+      <div id="copyright">
+        copyright (c) 2011 Joshua Pulham. MIT license
       </div>
     </div>
   </body>
